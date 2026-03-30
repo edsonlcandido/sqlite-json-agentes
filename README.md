@@ -61,7 +61,7 @@ Este agente utiliza o **Microsoft Agent Framework (MAF)** através do `ChatCompl
 2. O frontend lê o conteúdo do arquivo e envia via POST para o endpoint `/api/propostas/analisar`.
 3. O `AIAgentExtratorServiceMAF` cria um `ChatCompletionAgent` com:
    - **Kernel** configurado com Azure OpenAI (`gpt-4.1-mini`)
-   - **Instructions** carregadas do arquivo `Instructions/AgentExtratorInstructions.txt`
+   - **Instructions** carregadas do arquivo `SystemPrompts/AgentExtratorInstructions.txt`
    - **Temperature/TopP** em `0.5` para balancear criatividade e precisão
    - **MaxTokens** de `16384` para suportar fichas com muitos motores
 4. O agente processa a ficha de forma **stateless** — cada requisição cria um novo `ChatHistory`.
@@ -135,7 +135,7 @@ Converte perguntas em linguagem natural para queries SQL válidas para SQLite co
 
 - Usa `ChatClient` do Azure OpenAI SDK diretamente (sem Semantic Kernel)
 - **Temperature** `0.1` — muito baixa para gerar SQL determinístico e consistente
-- Instruções carregadas de `Instructions/AgentQueryBuilder.txt`
+- Instruções carregadas de `SystemPrompts/AgentQueryBuilder.txt`
 
 **Exemplos de conversão:**
 
