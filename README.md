@@ -1,14 +1,14 @@
-# Banco de Dados de Propostas
+# Banco de Dados de Motores Elétricos
 
-Sistema de extração, armazenamento e consulta inteligente de propostas técnicas de ventiladores industriais (centrífugos, axiais e mixed flow) utilizando agentes de IA com Azure OpenAI.
+Sistema de extração, armazenamento e consulta inteligente de catálogos e fichas técnicas de motores elétricos industriais utilizando agentes de IA com Azure OpenAI.
 
 ## Visão Geral
 
 O projeto é composto por um **backend ASP.NET Core 9** e um **frontend Vue.js 3** com Tailwind CSS. A aplicação permite:
 
-1. **Upload de propostas** — Arquivos `.txt` de propostas técnicas são enviados e processados por um agente de IA que extrai dados estruturados em JSON.
+1. **Upload de fichas técnicas** — Arquivos `.txt` de catálogos/fichas técnicas de motores elétricos são enviados e processados por um agente de IA que extrai dados estruturados em JSON.
 2. **Consulta inteligente** — O usuário faz perguntas em linguagem natural através de um chat, e uma cadeia de agentes converte a pergunta em SQL, executa no banco e retorna os resultados formatados.
-3. **Visualização de equipamentos** — Dashboard com os detalhes dos equipamentos extraídos das propostas.
+3. **Visualização de equipamentos** — Dashboard com os detalhes dos motores elétricos extraídos das fichas técnicas.
 
 ## Stack Tecnológica
 
@@ -53,47 +53,61 @@ O sistema utiliza **3 agentes de IA** organizados em dois fluxos independentes:
 
 **Endpoint:** `POST /api/propostas/analisar`
 
-Este agente utiliza o **Microsoft Agent Framework (MAF)** através do `ChatCompletionAgent` do Semantic Kernel. Ele é responsável por receber o conteúdo textual bruto de uma proposta técnica de ventilador e extrair um JSON estruturado com todas as informações relevantes.
+Este agente utiliza o **Microsoft Agent Framework (MAF)** através do `ChatCompletionAgent` do Semantic Kernel. Ele é responsável por receber o conteúdo textual bruto de uma ficha técnica de motor elétrico e extrair um JSON estruturado com todas as informações relevantes.
 
 #### Como funciona
 
-1. O usuário faz upload de um arquivo `.txt` contendo a proposta técnica na tela de **Upload**.
+1. O usuário faz upload de um arquivo `.txt` contendo a ficha técnica do motor na tela de **Upload**.
 2. O frontend lê o conteúdo do arquivo e envia via POST para o endpoint `/api/propostas/analisar`.
 3. O `AIAgentExtratorServiceMAF` cria um `ChatCompletionAgent` com:
    - **Kernel** configurado com Azure OpenAI (`gpt-4.1-mini`)
    - **Instructions** carregadas do arquivo `Instructions/AgentExtratorInstructions.txt`
    - **Temperature/TopP** em `0.5` para balancear criatividade e precisão
-   - **MaxTokens** de `16384` para suportar propostas com muitos equipamentos
-4. O agente processa a proposta de forma **stateless** — cada requisição cria um novo `ChatHistory`.
+   - **MaxTokens** de `16384` para suportar fichas com muitos motores
+4. O agente processa a ficha de forma **stateless** — cada requisição cria um novo `ChatHistory`.
 5. A resposta JSON é limpa (remoção de markdown, Unicode escapes, texto extra) e salva na tabela `propostas_json` do SQLite.
 
 #### Estrutura JSON extraída
 
 ```json
 {
-  "cliente": "Nome do Cliente",
-  "projeto": "Nome do Projeto",
-  "nossa_referencia": "339940-T5",
-  "data": "11/11/2025",
-  "preparado_por": "Eduardo Pontes",
+  "fabricante": "WEG",
+  "catalogo": "Motores Trifásicos - Linha W22",
+  "referencia": "CAT-W22-2026",
+  "data": "15/03/2026",
   "equipamentos": [
     {
-      "tipo": "centrifugo",
-      "modelo": "MVC 1650.00.15",
-      "vazao": [200, "kCFM"],
-      "pressao": [22.25, "inWg"],
-      "motor": {
-        "potencia": [850, "HP"],
-        "tensao": [4160, "V"],
-        "polos": 4
-      },
+      "tipo": "trifasico",
+      "carcaca": "355M/L",
+      "modelo": "W22 IR3 Premium",
+      "aplicacao": "Bomba centrífuga",
+      "potencia": [250, "kW"],
+      "tensao": [440, "V"],
+      "corrente_nominal": [420, "A"],
+      "frequencia": [60, "Hz"],
+      "polos": 4,
+      "rotacao": [1785, "rpm"],
+      "rendimento": [96.2, "%"],
+      "fator_potencia": 0.86,
+      "ip": "IP55",
+      "classe_isolamento": "F",
+      "regime": "S1",
+      "fator_servico": 1.15,
       "caracteristicas_construtivas": {
-        "carcaca": { "material": "ASTM A-36" },
-        "rotor": { "material": "SAR 80" }
+        "carcaca": { "material": "Ferro fundido" },
+        "rotor": { "material": "Alumínio injetado" },
+        "eixo": { "material": "SAE 1045" },
+        "rolamentos": {
+          "dianteiro": "6317-C3",
+          "traseiro": "6313-C3",
+          "lubrificacao": "Graxa"
+        }
       },
-      "escopo": {
-        "incluido": ["Motor elétrico", "Carcasa", "Silenciador"],
-        "excluido": ["Pernos de anclaje"]
+      "caracteristicas_eletricas": {
+        "corrente_partida_in": 7.5,
+        "torque_partida_tn": 2.2,
+        "torque_maximo_tn": 3.0,
+        "metodo_partida": "Inversor de frequência"
       }
     }
   ]
@@ -127,15 +141,16 @@ Converte perguntas em linguagem natural para queries SQL válidas para SQLite co
 
 | Pergunta | SQL Gerado |
 |---|---|
-| "Quais propostas têm motores acima de 500kW?" | `SELECT ... FROM propostas_json p, json_each(p.proposta, '$.equipamentos') AS e WHERE json_extract(e.value, '$.motor.potencia[0]') * CASE ... END > 500` |
-| "Liste ventiladores centrífugos com pressão acima de 3000 Pa" | `SELECT ... WHERE json_extract(e.value, '$.tipo') LIKE '%centr_fugo%' AND (pressão normalizada) > 3000` |
+| "Quais motores têm potência acima de 500kW?" | `SELECT ... FROM propostas_json p, json_each(p.proposta, '$.equipamentos') AS e WHERE json_extract(e.value, '$.potencia[0]') * CASE ... END > 500` |
+| "Liste motores trifásicos com rendimento acima de 95%" | `SELECT ... WHERE json_extract(e.value, '$.tipo') LIKE '%trif_sico%' AND json_extract(e.value, '$.rendimento[0]') > 95` |
+| "Motores com tensão 440V e 6 polos" | `SELECT ... WHERE json_extract(e.value, '$.tensao[0]') = 440 AND json_extract(e.value, '$.polos') = 6` |
 
 **Recursos avançados das instruções do Query Builder:**
 
 - Navegação em JSON aninhado via `json_extract` e `json_each`
-- **Conversão automática de unidades**: pressão (mmCA→Pa, inWg→Pa), vazão (m³/h→m³/s), potência (HP→kW, cv→kW)
-- Busca textual com suporte a acentos usando `LIKE` com wildcards (`%press_o%`)
-- Consulta em arrays de escopo com `EXISTS` + `json_each`
+- **Conversão automática de unidades**: potência (HP→kW, cv→kW), corrente (mA→A), tensão (kV→V)
+- Busca textual com suporte a acentos usando `LIKE` com wildcards (`%trif_sico%`)
+- Consulta em arrays de características com `EXISTS` + `json_each`
 
 #### Etapa 2 — Agente SQL Executor (`AISQLExecutorService`)
 
@@ -183,17 +198,17 @@ A tool de execução SQL implementa múltiplas camadas de segurança:
 ```sql
 CREATE TABLE propostas_json (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
-    proposta TEXT  -- JSON completo da proposta extraída
+    proposta TEXT  -- JSON completo da ficha técnica extraída
 );
 ```
 
 ### View `detalhes-equipamento`
 
-View que extrai e normaliza dados dos equipamentos para unidades SI:
+View que extrai e normaliza dados dos motores para unidades SI:
 
-- Pressão → Pa
-- Vazão → m³/s
 - Potência → kW
+- Corrente → A
+- Tensão → V
 
 Utiliza `json_extract` e `json_each` para desnormalizar os equipamentos do JSON armazenado.
 
@@ -203,9 +218,9 @@ Utiliza `json_extract` e `json_each` para desnormalizar os equipamentos do JSON 
 
 | Método | Endpoint | Descrição |
 |---|---|---|
-| `POST` | `/api/propostas/analisar` | Envia proposta para extração JSON via Agente Extrator (MAF) |
+| `POST` | `/api/propostas/analisar` | Envia ficha técnica para extração JSON via Agente Extrator (MAF) |
 | `POST` | `/api/propostas/query-ai` | Pergunta em linguagem natural → Orquestração de agentes → Resultados |
-| `GET` | `/api/equipamentos/detalhes` | Lista detalhes de todos os equipamentos (via view SQL) |
+| `GET` | `/api/equipamentos/detalhes` | Lista detalhes de todos os motores (via view SQL) |
 | `POST` | `/api/test/sql-executor` | Teste direto do executor SQL (debug) |
 
 ---
@@ -215,8 +230,8 @@ Utiliza `json_extract` e `json_each` para desnormalizar os equipamentos do JSON 
 | Rota | View | Descrição |
 |---|---|---|
 | `/` | `ChatView` | Chat com agente de consulta (perguntas em linguagem natural) |
-| `/upload` | `FileUploadView` | Upload de propostas `.txt` para extração |
-| `/equipamentos` | `EquipamentoDetalhesView` | Dashboard de equipamentos extraídos |
+| `/upload` | `FileUploadView` | Upload de fichas técnicas `.txt` para extração |
+| `/equipamentos` | `EquipamentoDetalhesView` | Dashboard de motores elétricos extraídos |
 
 ---
 
